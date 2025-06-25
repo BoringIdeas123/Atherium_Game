@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Floating City RPG  All Levels</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html, body { background:#111; font-family:monospace; overflow:hidden; }
+    canvas {
+      display: block;
+      margin: auto;
+      background-image: url("BackgroundforallRPG.png");
+      background-size: cover;
+      background-position: center;
+      border: 4px solid cyan;
+    }
+    #dialogue, #victory, #riddleBox {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 14px 26px;
+      font-size: 20px;
+      border-radius: 8px;
+      color: #0f0;
+      background: rgba(0,0,0,0.9);
+      border: 2px solid #0f0;
+      display: none;
+      z-index: 10;
+    }
+    #dialogue { top: 20px; }
+    #victory {
+      top: 40%;
+      font-size: 30px;
+      border: 3px solid lime;
+      color: lime;
+    }
+    #riddleBox {
+      top: 35%;
+      color: white;
+      text-align: center;
+    }
+    #riddleInput {
+      margin-top: 10px;
+      padding: 8px;
+      font-size: 18px;
+      width: 300px;
+    }
+    #submitBtn {
+      margin-top: 10px;
+      padding: 6px 16px;
+      font-size: 16px;
+      background: cyan;
+      border: none;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <!-- Background Audio -->
+  <audio id="gameAudio" autoplay loop>
+    <source src="Game Intro.mp3" type="audio/mp3" />
+    Your browser does not support the audio element.
+  </audio>
+  <canvas id="game" width="1280" height="720"></canvas>
+  <div id="dialogue"></div>
+  <div id="levelTitle" style="position:fixed; top:18px; right:32px; color:#fff; font-size:18px; font-family:monospace; background:rgba(0,0,0,0.7); padding:8px 22px; border-radius:8px; border:2px solid #0ff; z-index:20; pointer-events:none;"></div>
+  <div id="riddleBox">
+    <div id="riddleText">RIDDLE</div>
+    <input id="riddleInput" placeholder="Answer..." /><br/>
+    <button id="submitBtn">Submit</button>
+  </div>
+  <div id="victory"><Æ MISSION COMPLETE! CITY SAVED! <Ù=ð</div>
+
+  <!-- SOUND EFFECTS -->
+  <audio id="s-jump" src="https://cdn.pixabay.com/audio/2022/03/15/audio_9643c03f3f.mp3"></audio>
+  <audio id="s-pick" src="https://cdn.pixabay.com/audio/2022/03/15/audio_9643c03f3f.mp3"></audio>
+  <audio id="s-switch" src="https://cdn.pixabay.com/audio/2022/03/16/audio_9659832f1e.mp3"></audio>
+  <audio id="s-win" src="https://cdn.pixabay.com/audio/2022/03/15/audio_9643c03f3f.mp3"></audio>
+  <audio id="bg-music" src="https://cdn.pixabay.com/audio/2022/03/15/audio_9643c03f3f.mp3" autoplay loop></audio>
+
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    const dialogue = document.getElementById("dialogue");
+    const riddleBox = document.getElementById("riddleBox");
+    const riddleText = document.getElementById("riddleText");
+    const riddleInput = document.getElementById("riddleInput");
+    const submitBtn = document.getElementById("submitBtn");
+    const victoryDiv = document.getElementById("victory");
+
+    const sounds = {
+      jump: document.getElementById("s-jump"),
+      pick: document.getElementById("s-pick"),
+      sw: document.getElementById("s-switch"),
+      win: document.getElementById("s-win"),
+    };
+
+    let keys = {};
+    document.addEventListener("keydown", e => keys[e.key] = true);
+    document.addEventListener("keyup", e => keys[e.key] = false);
+
+    function showMessage(text, duration = 2500) {
+      // Colorize player and NPC lines
+      let html = text;
+      if (text.startsWith('User:') || text.startsWith('Player:')) {
+        html = `<span style="color:#3af; font-weight:bold;">${text}</span>`;
+      } else if (
+        text.startsWith('Ayush:') || text.startsWith('Karthik:') || text.startsWith('Shreyas:') ||
+        text.startsWith('Brick Dealer:') || text.startsWith('Vendor:') ||
+        text.startsWith('Botanist:') || text.startsWith('Engineer:') || text.startsWith('Archivist:')
+      ) {
+        html = `<span style="color:#3fa43f; font-weight:bold;">${text}</span>`;
+      }
+      dialogue.innerHTML = html;
+      dialogue.style.display = "block";
+      setTimeout(() => dialogue.style.display = "none", duration);
+    }
+
+    function coll(a, b) {
+      return a.x < b.x + b.w &&
+             a.x + a.w > b.x &&
+             a.y < b.y + b.h &&
+             a.y + a.h > b.y;
+    }
+
+    function drawLabel(text, x, y) {
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 14px monospace";
+      ctx.fillText(text, x, y - 6);
+    }
+
+    class Riddle {
+      constructor(question, answers, hint, fallback) {
+        this.question = question;
+        this.answers = answers;
+        this.hint = hint;
+        this.fallback = fallback;
+        this.attempts = 0;
+      }
+      ask(onCorrect) {
+        riddleText.textContent = this.question;
+        riddleInput.value = "";
+        riddleBox.style.display = "block";
+        submitBtn.onclick = () => {
+          const ans = riddleInput.value.trim().toLowerCase();
+          riddleBox.style.display = "none";
+          if (this.answers.includes(ans)) {
+            onCorrect();
+          } else {
+            this.attempts++;
+            if (this.attempts >= 3 && this.fallback) {
+              showMessage("Too many triesnew riddle loaded");
+              currentRiddle = this.fallback;
+            } else {
+              hintNPC = true;
+            }
+          }
+        };
+      }
+    }
+
+    const riddles = {
+      1: new Riddle(
+        "I protect the city, but I'm not alive. What am I?",
+        ["shield", "dome"],
+        "Hint NPC: Think of what covers & protects.",
+        new Riddle("I hold things back, I'm tall & hard. What am I?", ["wall"], "It's a solid structure.", null)
+      ),
+      2: new Riddle(
+        "I connect two places so supplies can pass. What am I?",
+        ["bridge"],
+        "Hint NPC: It spans a gap.",
+        new Riddle("I'm long & brown, above the ground. What am I?", ["bridge"], "Same word!", null)
+      ),
+      3: new Riddle(
+        "What shield protects from asteroids?",
+        ["dome"],
+        "Hint NPC: Same protector from Level 1.",
+        null
+      ),
+    };
+
+    let currentRiddle = null;
+    let hintNPC = false;
+    let level = 1;
+    const gravity = 0.5;
+
+    const player = {
+      x: 100,
+      y: 600,
+      vx: 0,
+      vy: 0,
+      w: 32,
+      h: 32,
+      speed: 5,
+      jumpForce: -12,
+      grounded: false
+    };
+
+    let inventory = [];
+    let inventoryPopups = {};
+    let inventoryPopupTimer = 0;
+    let inventoryPopupText = '';
+
+    const data = {
+      1: {
+        platforms: [
+          { x: 0, y: 680, w: 1280, h: 40 },
+          { x: 400, y: 550, w: 150, h: 20 },
+          { x: 600, y: 450, w: 150, h: 20 },
+          { x: 800, y: 350, w: 150, h: 20 },
+          { x: 1000, y: 250, w: 150, h: 20 },
+        ],
+        npcs: [
+          { x: 420, y: 518, w: 32, h: 32, id: 1, talked: false, name: 'Ayush' },
+          { x: 620, y: 418, w: 32, h: 32, id: 2, talked: false, name: 'Karthik' },
+          { x: 820, y: 318, w: 32, h: 32, id: 3, talked: false, name: 'Shreyas' },
+        ],
+        pipeline: { x: 700, y: 648, w: 64, h: 32, fixed: false, fixing: false },
+        switchObj: { x: 1050, y: 218, w: 32, h: 32, fixed: false, fixing: false },
+      },
+      2: {
+        platforms: [
+          { x: 0, y: 680, w: 400, h: 40 }, // left platform
+          { x: 600, y: 680, w: 400, h: 40 }, // right platform
+        ],
+        gap: { x: 400, y: 680, w: 200, h: 40 }, // gap between platforms
+        bridgeBricks: [
+          { x: 420, y: 680, placed: false },
+          { x: 480, y: 680, placed: false },
+          { x: 540, y: 680, placed: false },
+        ],
+        brickDealer: { x: 100, y: 648, w: 32, h: 32, talked: false, bricksGiven: 0 },
+        vendor: { x: 900, y: 648, w: 32, h: 32, thanked: false },
+        _initialized: false,
+        _bridgePlatformAdded: false
+      },
+      3: {
+        platforms: [
+          { x: 0, y: 680, w: 1280, h: 40 }, // ground
+          { x: 300, y: 580, w: 100, h: 20 }, // 1st platform
+          { x: 600, y: 500, w: 100, h: 20 }, // 2nd platform
+          { x: 900, y: 420, w: 100, h: 20 }, // 3rd platform
+          { x: 1050, y: 340, w: 100, h: 20 }, // lock platform (lowered and right)
+        ],
+        npcs: [
+          { x: 320, y: 548, w: 32, h: 32, talked: false, name: 'Botanist' },
+          { x: 620, y: 468, w: 32, h: 32, talked: false, name: 'Engineer' },
+          { x: 920, y: 388, w: 32, h: 32, talked: false, name: 'Archivist' },
+        ],
+        lock: { x: 1070, y: 308, w: 40, h: 40, unlocked: false },
+        codeInput: '',
+        codeUI: false,
+        codeCorrect: '5932',
+      }
+    };
+
+    // --- Conversation helpers for Level 1, 2, 3 ---
+    let activeConversation = null;
+    let conversationStep = 0;
+    let conversationCallback = null;
+    let conversationNPC = null;
+    function startConversation(lines, onEnd, npcObj) {
+      activeConversation = lines;
+      conversationStep = 0;
+      conversationCallback = onEnd;
+      conversationNPC = npcObj;
+      showMessage(activeConversation[conversationStep], 99999);
+    }
+    function progressConversation() {
+      if (!activeConversation) return;
+      conversationStep++;
+      if (conversationStep < activeConversation.length) {
+        showMessage(activeConversation[conversationStep], 99999);
+      } else {
+        activeConversation = null;
+        conversationStep = 0;
+        conversationNPC = null;
+        dialogue.style.display = "none";
+        if (conversationCallback) conversationCallback();
+      }
+    }
+    document.addEventListener("keydown", function(e) {
+      if (activeConversation && e.key === " ") {
+        progressConversation();
+      }
+    });
+    function checkConversationProximity() {
+      if (activeConversation && conversationNPC && !coll(player, conversationNPC)) {
+        activeConversation = null;
+        conversationStep = 0;
+        conversationNPC = null;
+        dialogue.style.display = "none";
+      }
+    }
+
+    // Track which NPC the player is currently near for conversation
+    let lastNPCInteracted = null;
+
+    // Preload player and NPC images
+    const playerImg = new Image();
+    playerImg.src = 'PlyerRpg.png';
+    const npcImg = new Image();
+    npcImg.src = 'NPCRpg.png';
+    // Preload pipe and switch images
+    const pipeImg = new Image();
+    pipeImg.src = 'PipeRpg.png';
+    const switchImg = new Image();
+    switchImg.src = 'Switchrpg.png';
+    // Preload lock image
+    const lockImg = new Image();
+    lockImg.src = 'LockRpg.png';
+
+    function update() {
+      player.vx = 0;
+      if (keys["ArrowLeft"]) player.vx = -player.speed;
+      if (keys["ArrowRight"]) player.vx = player.speed;
+      if (keys["ArrowUp"] && player.grounded) {
+        player.vy = player.jumpForce;
+        player.grounded = false;
+        sounds.jump.play();
+      }
+
+      player.vy += gravity;
+      player.x += player.vx;
+      player.y += player.vy;
+      player.grounded = false;
+
+      data[level].platforms.forEach(p => {
+        if (player.vy >= 0 && coll(player, p)) {
+          player.y = p.y - player.h;
+          player.vy = 0;
+          player.grounded = true;
+        }
+      });
+    }
+
+    function drawInventory() {
+      ctx.save();
+      ctx.globalAlpha = 0.85;
+      ctx.fillStyle = '#222';
+      ctx.fillRect(10, 10, 220, 40);
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#fff';
+      ctx.font = '16px monospace';
+      ctx.fillText('Inventory: ' + (inventory.length ? inventory.join(', ') : 'Empty'), 20, 35);
+      // Draw popup if active
+      if (inventoryPopupTimer > 0 && inventoryPopupText) {
+        ctx.fillStyle = '#0f0';
+        ctx.font = 'bold 16px monospace';
+        ctx.fillText('+' + inventoryPopupText + '!', 170, 35);
+      }
+      ctx.restore();
+    }
+
+    function lvl1() {
+      const d = data[1];
+      document.getElementById('levelTitle').textContent = 'LEVEL 1: Water and Electricity';
+      ctx.fillStyle = "#000";
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      d.platforms.forEach(p => {
+        ctx.fillStyle = "#444";
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+      });
+      // Draw NPCs
+      d.npcs.forEach((npc, idx) => {
+        const nw = npc.w * 1.25;
+        const nh = npc.h * 1.25;
+        ctx.drawImage(npcImg, npc.x - (nw - npc.w) / 2, npc.y - (nh - npc.h) / 2, nw, nh);
+        drawLabel(npc.name, npc.x, npc.y);
+      });
+      // Draw pipeline
+      const pipeW = d.pipeline.w * 1.25;
+      const pipeH = d.pipeline.h * 1.25;
+      ctx.drawImage(pipeImg, d.pipeline.x - (pipeW - d.pipeline.w) / 2, d.pipeline.y - (pipeH - d.pipeline.h) / 2, pipeW, pipeH);
+      drawLabel("PIPELINE", d.pipeline.x, d.pipeline.y);
+      // Draw switch
+      const switchW = d.switchObj.w * 1.5;
+      const switchH = d.switchObj.h * 1.5;
+      ctx.drawImage(switchImg, d.switchObj.x - (switchW - d.switchObj.w) / 2, d.switchObj.y - (switchH - d.switchObj.h) / 2, switchW, switchH);
+      drawLabel("SWITCH", d.switchObj.x, d.switchObj.y);
+      // Draw player
+      const pw = player.w * 1.25;
+      const ph = player.h * 1.25;
+      ctx.drawImage(playerImg, player.x - (pw - player.w) / 2, player.y - (ph - player.h) / 2, pw, ph);
+      drawLabel("PLAYER", player.x, player.y);
+      drawInventory();
+
+      // NPC 1 (Ayush) interaction (pipe)
+      let npc1 = d.npcs[0];
+      if (coll(player, npc1) && !activeConversation && keys[" "] && lastNPCInteracted !== npc1) {
+        lastNPCInteracted = npc1;
+        startConversation([
+          "Ayush: Take this pipe to fix the pipe!",
+          "User: Ok, thanks, sir",
+          "Ayush: No problem."
+        ], () => {
+          if (!inventory.includes("Pipe")) {
+            inventory.push("Pipe");
+            inventoryPopups["Pipe"] = true;
+            inventoryPopupText = "Pipe";
+            inventoryPopupTimer = 60;
+          }
+        }, npc1);
+      } else if (!coll(player, npc1)) {
+        if (lastNPCInteracted === npc1) lastNPCInteracted = null;
+      }
+      // NPC 2 (Karthik) interaction (buffer NPC)
+      let npc2 = d.npcs[1];
+      if (coll(player, npc2) && !activeConversation && keys[" "] && lastNPCInteracted !== npc2) {
+        lastNPCInteracted = npc2;
+        startConversation([
+          "Karthik: Since a few days we have had no electricity, It is completely dark.",
+          "User: Is there any way to fix it?",
+          "Karthik: There is one who knows better to solve this issue"
+        ], () => {}, npc2);
+      } else if (!coll(player, npc2)) {
+        if (lastNPCInteracted === npc2) lastNPCInteracted = null;
+      }
+      // NPC 3 (Shreyas) interaction (resistor NPC)
+      let npc3 = d.npcs[2];
+      if (coll(player, npc3) && !activeConversation && keys[" "] && lastNPCInteracted !== npc3) {
+        lastNPCInteracted = npc3;
+        startConversation([
+          "Shreyas: I have a resistor; it is dangerous for me to go",
+          "User: I could try so",
+          "Shreyas: Ok then, take it. All the best!",
+          "User: Thanks!"
+        ], () => {
+          if (!inventory.includes("Resistor")) {
+            inventory.push("Resistor");
+            inventoryPopups["Resistor"] = true;
+            inventoryPopupText = "Resistor";
+            inventoryPopupTimer = 60;
+          }
+        }, npc3);
+      } else if (!coll(player, npc3)) {
+        if (lastNPCInteracted === npc3) lastNPCInteracted = null;
+      }
+      // Pipeline fixing
+      if (inventory.includes("Pipe") && coll(player, d.pipeline) && !d.pipeline.fixed) {
+        if (!d.pipeline.fixing) {
+          showMessage("Press SPACE to fix the pipeline", 2000);
+          d.pipeline.fixing = true;
+        }
+        if (keys[" "]) {
+          d.pipeline.fixed = true;
+          d.pipeline.fixing = false;
+          showMessage("Pipeline fixed!", 2000);
+        }
+      } else {
+        d.pipeline.fixing = false;
+      }
+      // Switch fixing
+      if (inventory.includes("Resistor") && coll(player, d.switchObj) && !d.switchObj.fixed) {
+        if (!d.switchObj.fixing) {
+          showMessage("Press SPACE to fix the switch", 2000);
+          d.switchObj.fixing = true;
+        }
+        if (keys[" "]) {
+          d.switchObj.fixed = true;
+          d.switchObj.fixing = false;
+          showMessage("Switch fixed!", 2000);
+        }
+      } else {
+        d.switchObj.fixing = false;
+      }
+      // Level complete
+      if (d.pipeline.fixed && d.switchObj.fixed) {
+        showMessage("Power restored! Level 2 loading...", 3000);
+        setTimeout(() => {
+          level = 2;
+        }, 1000);
+      }
+    }
+
+    function lvl2() {
+      const d = data[2];
+      document.getElementById('levelTitle').textContent = 'LEVEL 2: Reconstructing the Bridge';
+      // Set player start position and clear inventory at level start
+      if (!d._initialized) {
+        player.x = 120;
+        player.y = 600;
+        inventory = [];
+        d.brickDealer.talked = false;
+        d.brickDealer.bricksGiven = 0;
+        d.vendor.thanked = false;
+        d.bridgeBricks.forEach(b => b.placed = false);
+        d._initialized = true;
+      }
+      ctx.fillStyle = "#000";
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Draw platforms
+      d.platforms.forEach(p => {
+        ctx.fillStyle = "#444";
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+      });
+      // Draw gap
+      ctx.fillStyle = "#222";
+      ctx.fillRect(d.gap.x, d.gap.y, d.gap.w, d.gap.h);
+      // Draw bridge bricks
+      d.bridgeBricks.forEach((b, i) => {
+        if (b.placed) {
+          ctx.fillStyle = "#b55";
+          ctx.fillRect(b.x, b.y, 56, 40);
+          drawLabel("BRICK", b.x, b.y);
+        }
+      });
+      // Draw brick dealer
+      const bdw = d.brickDealer.w * 1.25;
+      const bdh = d.brickDealer.h * 1.25;
+      ctx.drawImage(npcImg, d.brickDealer.x - (bdw - d.brickDealer.w) / 2, d.brickDealer.y - (bdh - d.brickDealer.h) / 2, bdw, bdh);
+      drawLabel("Brick Dealer", d.brickDealer.x, d.brickDealer.y);
+      // Draw vendor
+      const vw = d.vendor.w * 1.25;
+      const vh = d.vendor.h * 1.25;
+      ctx.drawImage(npcImg, d.vendor.x - (vw - d.vendor.w) / 2, d.vendor.y - (vh - d.vendor.h) / 2, vw, vh);
+      drawLabel("Vendor", d.vendor.x, d.vendor.y);
+      // Draw player
+      const pw = player.w * 1.25;
+      const ph = player.h * 1.25;
+      ctx.drawImage(playerImg, player.x - (pw - player.w) / 2, player.y - (ph - player.h) / 2, pw, ph);
+      drawLabel("PLAYER", player.x, player.y);
+      drawInventory();
+
+      // Brick Dealer conversation (only once)
+      if (coll(player, d.brickDealer) && !activeConversation && keys[" "] && !d.brickDealer.talked && lastNPCInteracted !== d.brickDealer) {
+        lastNPCInteracted = d.brickDealer;
+        startConversation([
+          "Brick Dealer: Did you see that meteor? It completely shattered the bridge.",
+          "Player: Yeah, I noticed... Any idea how we can fix it?",
+          "Brick Dealer: I've got a stash of bricks from the last repair job. You can use them, they're in my pack.",
+          "Player: That's perfect. Thanks - I'll get to work"
+        ], () => {
+          d.brickDealer.talked = true;
+          if (inventory.length === 0) {
+            inventory.push("Brick", "Brick", "Brick");
+            inventoryPopups["Brick"] = true;
+            inventoryPopupText = "Brick x3";
+            inventoryPopupTimer = 60;
+            d.brickDealer.bricksGiven = 3;
+          }
+        }, d.brickDealer);
+      } else if (!coll(player, d.brickDealer)) {
+        if (lastNPCInteracted === d.brickDealer) lastNPCInteracted = null;
+      }
+      // Place all bricks at bridge at once (now requires DOWN ARROW)
+      const bridgeEdge = { x: d.gap.x, y: d.gap.y - 32, w: d.gap.w, h: 64 };
+      if (d.brickDealer.talked && inventory.filter(i => i === "Brick").length === 3 && coll(player, bridgeEdge) && keys["ArrowDown"]) {
+        d.bridgeBricks.forEach(b => b.placed = true);
+        // Remove all bricks from inventory
+        inventory = inventory.filter(i => i !== "Brick");
+        showMessage("Bridge fixed! You can now cross.", 1800);
+      }
+      // Draw the completed bridge visually if all bricks are placed
+      const bridgeComplete = d.bridgeBricks.every(b => b.placed);
+      if (bridgeComplete) {
+        ctx.fillStyle = "#888";
+        ctx.fillRect(d.gap.x, d.gap.y, d.gap.w, d.gap.h);
+        drawLabel("BRIDGE", d.gap.x + d.gap.w / 2 - 30, d.gap.y + 10);
+        // Add a temporary platform for collision
+        if (!d._bridgePlatformAdded) {
+          d.platforms.push({ x: d.gap.x, y: d.gap.y, w: d.gap.w, h: d.gap.h });
+          d._bridgePlatformAdded = true;
+        }
+      }
+      // Vendor thanks after bridge is built
+      if (bridgeComplete && coll(player, d.vendor) && !d.vendor.thanked && keys[" "]) {
+        startConversation([
+          "Vendor: The food trucks had been stalled for many days; finally, my supplies have arrived. Thank you for building that bridge!"
+        ], () => {
+          d.vendor.thanked = true;
+          setTimeout(() => {
+            showMessage("Level 3 loading...", 2000);
+            setTimeout(() => {
+              level = 3;
+            }, 1200);
+          }, 3200);
+        });
+      }
+      // Prevent player from reaching right platform until bridge is complete
+      if (!bridgeComplete && player.x + player.w > d.gap.x && player.x < d.gap.x + d.gap.w) {
+        // Push player back to left
+        player.x = d.gap.x - player.w;
+      }
+    }
+
+    function lvl3() {
+      const d = data[3];
+      document.getElementById('levelTitle').textContent = 'LEVEL 3: Fixing the Dome and the City';
+      ctx.fillStyle = "#000";
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      d.platforms.forEach(p => {
+        ctx.fillStyle = "#444";
+        ctx.fillRect(p.x, p.y, p.w, p.h);
+      });
+      // Draw NPCs
+      d.npcs.forEach((npc, idx) => {
+        const nw = npc.w * 1.25;
+        const nh = npc.h * 1.25;
+        ctx.drawImage(npcImg, npc.x - (nw - npc.w) / 2, npc.y - (nh - npc.h) / 2, nw, nh);
+        drawLabel(npc.name, npc.x, npc.y);
+      });
+      // Draw lock
+      const lw = d.lock.w * 1.25;
+      const lh = d.lock.h * 1.25;
+      ctx.drawImage(lockImg, d.lock.x - (lw - d.lock.w) / 2, d.lock.y - (lh - d.lock.h) / 2, lw, lh);
+      drawLabel("LOCK", d.lock.x, d.lock.y);
+      // Draw player
+      const pw = player.w * 1.25;
+      const ph = player.h * 1.25;
+      ctx.drawImage(playerImg, player.x - (pw - player.w) / 2, player.y - (ph - player.h) / 2, pw, ph);
+      drawLabel("PLAYER", player.x, player.y);
+
+      // Botanist conversation
+      let botanist = d.npcs[0];
+      if (coll(player, botanist) && !activeConversation && keys[" "] && lastNPCInteracted !== botanist) {
+        lastNPCInteracted = botanist;
+        startConversation([
+          'Botanist: "There used to be nine bioluminescent orchids in that patch. Now only five bloom..."',
+          'Botanist: "Three wilted in the meteor shower. Two never even grew."',
+          'Player: The meteor shower was devastating!'
+        ], () => {}, botanist);
+      } else if (!coll(player, botanist)) {
+        if (lastNPCInteracted === botanist) lastNPCInteracted = null;
+      }
+      // Engineer conversation
+      let engineer = d.npcs[1];
+      if (coll(player, engineer) && !activeConversation && keys[" "] && lastNPCInteracted !== engineer) {
+        lastNPCInteracted = engineer;
+        startConversation([
+          'Engineer: "I always liked symmetry  five control panels, nine backup lights... makes the place feel balanced, you know?"',
+          'Player : Uhmm. Yeah...',
+          'Engineer: I replaced three of the panels last week. Should\'ve just replaced two  might\'ve saved me the trouble."',
+          'Player: Ok... I see.'
+        ], () => {}, engineer);
+      } else if (!coll(player, engineer)) {
+        if (lastNPCInteracted === engineer) lastNPCInteracted = null;
+      }
+      // Archivist conversation
+      let archivist = d.npcs[2];
+      if (coll(player, archivist) && !activeConversation && keys[" "] && lastNPCInteracted !== archivist) {
+        lastNPCInteracted = archivist;
+        startConversation([
+          'Archivist: The code! Funny thing  I remember it started strong, then faltered.',
+          'Archivist: Like... bold decisions followed by compromise.',
+          'Player: You know the code! What is it?',
+          'Archivist: If I had to put numbers to it? Five, nine  then it got shaky.',
+          'Player: Please try to remember it!',
+          'Archivist: Oh yes, yes! Oh, actually no... Sorry, I can\'t recall it.',
+          'Player: Its fine. I may be able to restore the dome.'
+        ], () => {}, archivist);
+      } else if (!coll(player, archivist)) {
+        if (lastNPCInteracted === archivist) lastNPCInteracted = null;
+      }
+      // Lock code input UI
+      if (!d.lock.unlocked && coll(player, d.lock) && !d.codeUI) {
+        d.codeUI = true;
+        d.codeInput = '';
+        showMessage('Enter the 4-digit code (use number keys, Enter to submit):', 99999);
+      }
+      if (d.codeUI) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(0,0,0,0.85)';
+        ctx.fillRect(400, 200, 480, 120);
+        ctx.fillStyle = '#fff';
+        ctx.font = '28px monospace';
+        ctx.fillText('LOCK CODE:', 440, 260);
+        ctx.font = 'bold 40px monospace';
+        ctx.fillText(d.codeInput.padEnd(4, '_'), 650, 260);
+        ctx.restore();
+      }
+      if (d.codeUI) {
+        document.onkeydown = function(e) {
+          if (d.codeInput.length < 4 && e.key >= '0' && e.key <= '9') {
+            d.codeInput += e.key;
+            showMessage('Enter the 4-digit code (use number keys, Enter to submit):', 99999);
+          } else if (e.key === 'Backspace') {
+            d.codeInput = d.codeInput.slice(0, -1);
+            showMessage('Enter the 4-digit code (use number keys, Enter to submit):', 99999);
+          } else if (e.key === 'Enter' && d.codeInput.length === 4) {
+            if (d.codeInput === d.codeCorrect) {
+              d.lock.unlocked = true;
+              d.codeUI = false;
+              showMessage('Lock opened! Dome restored!', 2000);
+              setTimeout(() => {
+                window.location.href = 'outro.html';
+              }, 2000);
+            } else {
+              showMessage('Incorrect code. Try again.', 2000);
+              d.codeInput = '';
+            }
+          }
+        };
+      } else {
+        document.onkeydown = null;
+      }
+    }
+
+    function gameLoop() {
+      update();
+      checkConversationProximity();
+      if (inventoryPopupTimer > 0) {
+        inventoryPopupTimer--;
+        if (inventoryPopupTimer === 0) inventoryPopupText = '';
+      }
+      if (level === 1) lvl1();
+      else if (level === 2) lvl2();
+      else lvl3();
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Start audio on user interaction if autoplay is blocked
+    const gameAudio = document.getElementById("gameAudio");
+    document.body.addEventListener("click", () => {
+      gameAudio.play().catch(() => {});
+    }, { once: true });
+
+    gameLoop();
+  </script>
+</body>
+</html>
