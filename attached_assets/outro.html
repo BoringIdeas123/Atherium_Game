@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Game Outro</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #000;
+      overflow: hidden;
+    }
+    video {
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <video id="outroVideo" src="OutrovideoRPG.mp4" autoplay playsinline></video>
+  <script>
+    const video = document.getElementById('outroVideo');
+    video.onended = function() {
+      window.location.href = 'startofthegame.html';
+    };
+    // Optional: skip to intro if video fails to load
+    video.onerror = function() {
+      window.location.href = 'startofthegame.html';
+    };
+  </script>
+</body>
+</html>
