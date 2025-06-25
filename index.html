@@ -3,10 +3,180 @@
 <head>
   <meta charset="UTF-8" />
   <title>Aetherium HFS</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: black;
+      overflow: hidden;
+      font-family: monospace;
+    }
 
+    #introVideo {
+      position: absolute;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      z-index: 1;
+    }
+
+    #controls {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+      text-align: center;
+    }
+
+    .btn {
+      margin: 12px;
+      padding: 12px 32px;
+      font-size: 18px;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      border: 2px solid white;
+      cursor: pointer;
+      transition: background 0.3s ease;
+      width: 200px;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+  </style>
 </head>
 <body>
 
-  <h1>Hellooooo</h1>
+  <!-- Main Intro UI -->
+  <div id="introBg" style="position:fixed; top:0; left:0; width:100vw; height:100vh; background:url('./BackgroundforallRPG.png') center/cover no-repeat; z-index:1;"></div>
+  <div id="introOverlay" style="position:fixed; top:0; left:0; width:100vw; height:100vh; z-index:2; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+    <div id="controls" style="display:flex; flex-direction:column; align-items:center;">
+      <span style="font-size:64px; color:white; letter-spacing:0.2em; font-weight:bold; text-shadow:0 4px 16px #000; margin-bottom:32px;">AETHERIUM</span>
+      <button class="btn" onclick="startGame()">PLAY</button><br />
+      <button class="btn" onclick="openModal('aboutModal')">ABOUT</button><br />
+      <button class="btn" onclick="openModal('creditsModal')">CREDITS</button>
+    </div>
+  </div>
+  <!-- Hidden video for intro, only shown after PLAY -->
+  <video id="introVideo" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; object-fit:cover; z-index:1000; background:#000;" muted playsinline preload="metadata" controls>
+    <source src="introvideoRPG.mp4" type="video/mp4" />
+    Your browser does not support the video tag.
+  </video>
+
+  <!-- Background Audio -->
+  <audio id="introAudio" autoplay loop>
+    <source src="Game Intro.mp3" type="audio/mp3" />
+    Your browser does not support the audio element.
+  </audio>
+
+  <!-- About Modal -->
+  <div id="aboutModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.92); color:white; z-index:100; text-align:center;">
+    <div style="max-width:600px; margin:80px auto; background:rgba(0,0,0,0.8); padding:32px; border-radius:12px; border:2px solid #fff; position:relative;">
+      <h2>About</h2>
+      <p style="text-align:left; font-size:18px;">
+        The game is set in a futuristic city called Elysium, floating in the clouds.<br>
+        A meteor shower has destroyed a lot of the city's vital infrastructure, and it may fall out of the sky.<br>
+        You are a robot, whose goal is to save the city from falling out of the sky. The game is divided into three levels.<br><br>
+        <b>Level 1 : Water and Electricity Systems</b><br>
+        Fix the pipeline and switches for electricity by talking and navigating through the level.<br><br>
+        <b>Level 2 : Bridge</b><br>
+        Reconstruct the vital bridge which brings resources and food into the city.<br><br>
+        <b>Level 3: Dome and the City</b><br>
+        Make a dome around the city and protect it from the incoming meteors.<br><br>
+        <b>Controls</b><br>
+        Arrow keys to move. Space. Down arrow to place items.
+      </p>
+      <button class="btn" onclick="closeModal('aboutModal')">CLOSE</button>
+    </div>
+  </div>
+  <!-- Credits Modal -->
+  <div id="creditsModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.92); color:white; z-index:100; text-align:center;">
+    <div style="max-width:600px; margin:80px auto; background:rgba(0,0,0,0.8); padding:32px; border-radius:12px; border:2px solid #fff; position:relative;">
+      <h2>Credits</h2>
+      <p style="text-align:left; font-size:18px;">
+        <b>Developed By</b><br>
+        Ansh and Priyanshu<br><br>
+        <b>Sound & Music</b><br>
+        Google Doodle- Rise of the Half Moon<br><br>
+        <b>Tools Used</b><br>
+        Javascript, HTML and CSS<br>
+        VS Code<br><br>
+        <b>Special Thanks</b><br>
+        Lakshya Purohit - a friend for testing and helping<br>
+        Family<br>
+        Teachers - Mrs. Prasanya ma'am, Mrs. Girija ma'am, Mrs. Ruchika ma'am
+      </p>
+      <button class="btn" onclick="closeModal('creditsModal')">CLOSE</button>
+    </div>
+  </div>
+
+  <script>
+    function startGame() {
+      // Hide intro UI
+      document.getElementById('introBg').style.display = 'none';
+      document.getElementById('introOverlay').style.display = 'none';
+      // Show and play video
+      const video = document.getElementById('introVideo');
+      video.style.display = 'block';
+      video.currentTime = 0;
+      
+      // Add error handler first
+      video.onerror = function() {
+        console.log('Video failed to load, proceeding to game');
+        window.location.href = 'intro.html';
+      };
+      
+      // Check if video can be loaded
+      video.onloadedmetadata = function() {
+        console.log('Video metadata loaded successfully');
+      };
+      
+      // Try to play the video with error handling
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          console.log('Video playing successfully');
+        }).catch(error => {
+          console.log('Video play failed:', error);
+          // If video fails to play, go directly to game
+          setTimeout(() => {
+            window.location.href = 'intro.html';
+          }, 1000);
+        });
+      }
+      
+      video.onended = function() {
+        window.location.href = 'intro.html';
+      };
+      
+      // Add click to skip video
+      video.onclick = function() {
+        video.pause();
+        window.location.href = 'intro.html';
+      };
+      
+      // Fallback: if video doesn't start within 5 seconds, proceed to game
+      setTimeout(() => {
+        if (video.paused || video.readyState < 2) {
+          console.log('Video timeout, proceeding to game');
+          window.location.href = 'intro.html';
+        }
+      }, 5000);
+    }
+    function openModal(id) {
+      document.getElementById(id).style.display = 'block';
+    }
+    function closeModal(id) {
+      document.getElementById(id).style.display = 'none';
+    }
+
+    // Start audio on user interaction if autoplay is blocked
+    const audio = document.getElementById("introAudio");
+    document.body.addEventListener("click", () => {
+      audio.play().catch(() => {});
+    }, { once: true });
+  </script>
+
 </body>
 </html>
